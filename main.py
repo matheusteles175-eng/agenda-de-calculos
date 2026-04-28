@@ -57,21 +57,22 @@ if st.session_state.logado:
     # --- DADOS DO USUÁRIO ---
     st.sidebar.markdown(f"### 👤 {st.session_state.usuario_atual.capitalize()}")
     
-    arq_dados = f"dados_{st.session_state.usuario_atual.lower()}.csv"
-    arq_meta = f"meta_{st.session_state.usuario_atual.lower()}.txt" # Arquivo para salvar a meta individual
+    usuario_path = st.session_state.usuario_atual.lower()
+    arq_dados = f"dados_{usuario_path}.csv"
+    arq_meta = f"meta_{usuario_path}.txt"
 
-    # Carregar a meta salva ou definir 0.0 se não existir
     if os.path.exists(arq_meta):
         with open(arq_meta, "r") as f:
-            meta_salva = float(f.read())
+            try:
+                meta_salva = float(f.read())
+            except:
+                meta_salva = 0.0
     else:
         meta_salva = 0.0
 
-    # --- CAMPO DE META NA BARRA LATERAL ---
     st.sidebar.markdown("---")
-    nova_meta = st.sidebar.number_input("🎯 Defina sua Meta (R$)", min_value=0.0, value=meta_salva, step=10.0)
+    nova_meta = st.sidebar.number_input("🎯 Sua Meta Diária (R$)", min_value=0.0, value=meta_salva, step=10.0)
     
-    # Se o usuário mudar a meta, a gente salva no arquivo .txt
     if nova_meta != meta_salva:
         with open(arq_meta, "w") as f:
             f.write(str(nova_meta))
@@ -90,9 +91,9 @@ if st.session_state.logado:
         st.subheader("📝 Novo Lançamento")
         col_g, col_p = st.columns(2)
         with col_g:
-            g = st.number_input("Ganho (R$)", min_value=0.0, step=10.0, key="input_ganho")
+            g = st.number_input("Ganho (R$)", min_value=0.0, step=1.0, key="input_ganho")
         with col_p:
-            p = st.number_input("Gasto (R$)", min_value=0.0, step=10.0, key="input_gasto")
+            p = st.number_input("Gasto (R$)", min_value=0.0, step=1.0, key="input_gasto")
         
         if st.button("➕ SALVAR REGISTRO", use_container_width=True, type="primary"):
             nova_linha = pd.DataFrame({"Data": [date.today().strftime("%d/%m/%Y")], "Ganho": [g], "Gasto": [p]})
@@ -104,18 +105,42 @@ if st.session_state.logado:
     # --- MÉTRICAS COM LÓGICA DE META ---
     if not df_dados.empty:
         hoje = date.today().strftime("%d/%m/%Y")
+        # Garantir que as colunas são números
+        df_dados['Ganho'] = pd.to_numeric(df_dados['Ganho'], errors='coerce').fillna(0)
+        df_dados['Gasto'] = pd.to_numeric(df_dados['Gasto'], errors='coerce').fillna(0)
+        
         df_hoje = df_dados[df_dados['Data'] == hoje]
+        saldo_hoje = df_hoje['Ganho'].sum() - df_hoje['Gasto'].sum()
         
-        ganho_hoje = df_hoje['Ganho'].sum()
-        gasto_hoje = df_hoje['Gasto'].sum()
-        saldo_hoje = ganho_hoje - gasto_hoje
-        
-        # Só ativa a cor se a meta for maior que zero
         if nova_meta > 0:
-            cor_meta = "#28a745" if saldo_hoje >= nova_meta else "#dc3545"
-            label_meta = "✅ META ATINGIDA!" if saldo_hoje >= nova_meta else "❌ ABAIXO DA META"
-            meta_info = f"(Meta: R$ {nova_meta:.2f})"
+            atingiu = saldo_hoje >= nova_meta
+            cor_meta = "#28a745" if atingiu else "#dc3545"
+            label_meta = "✅ META ATINGIDA!" if atingiu else "❌ ABAIXO DA META"
         else:
-            cor_meta = "#333" # Cinza se não tiver meta
-            label_meta
-                               
+            cor_meta = "#333"
+            label_meta = "🎯 DEFINA UMA META"
+
+        st.markdown(f"""
+            <div style="background-color: {cor_meta}; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
+                <h2 style="color: white; margin: 0;">Hoje: R$ {saldo_hoje:.2f}</h2>
+                <strong style="color: white;">{label_meta}</strong>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Histórico
+        st.markdown("---")
+        st.subheader("🗓️ Histórico")
+        for i, row in df_dados.iloc[::-1].iterrows(): # Mostra o mais recente primeiro
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([1.5, 2, 2, 0.5])
+                c1.write(row['Data'])
+                c2.markdown(f"<span style='color: #28a745;'>▲ R$ {row['Ganho']:.2f}</span>", unsafe_allow_html=True)
+                c3.markdown(f"<span style='color: #dc3545;'>▼ R$ {row['Gasto']:.2f}</span>", unsafe_allow_html=True)
+                if c4.button("🗑️", key=f"del_{i}"):
+                    df_dados = df_dados.drop(i)
+                    df_dados.to_csv(arq_dados, index=False)
+                    st.rerun()
+    else:
+        st.info("Nenhum dado lançado ainda.")
+else:
+    tela_acesso()
