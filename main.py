@@ -58,7 +58,7 @@ if st.session_state.logado:
     arq_dados = f"dados_{usuario_path}.csv"
     arq_meta = f"meta_{usuario_path}.txt"
 
-    # Carregar meta salva
+    # Carrega a meta da memória
     if os.path.exists(arq_meta):
         with open(arq_meta, "r") as f:
             try: meta_atual = float(f.read())
@@ -73,26 +73,41 @@ if st.session_state.logado:
 
     st.title(f"📊 Gestão de Ganhos")
 
-    # --- FORMULÁRIO DE LANÇAMENTO COM CAMPO DE META ---
-    df_dados = pd.read_csv(arq_dados) if os.path.exists(arq_dados) else pd.DataFrame(columns=["Data", "Ganho", "Gasto"])
+    # Tenta ler os dados, se não existir cria um vazio
+    if os.path.exists(arq_dados):
+        df_dados = pd.read_csv(arq_dados)
+        df_dados['Ganho'] = pd.to_numeric(df_dados['Ganho'], errors='coerce').fillna(0)
+        df_dados['Gasto'] = pd.to_numeric(df_dados['Gasto'], errors='coerce').fillna(0)
+    else:
+        df_dados = pd.DataFrame(columns=["Data", "Ganho", "Gasto"])
 
+    # --- FORMULÁRIO DE LANÇAMENTO ---
     with st.container(border=True):
-        st.subheader("📝 Lançamento Diário")
+        st.subheader("🎯 Configuração Diária")
         
-        # Campo de Meta - Fica no topo e atualiza a memória
-        nova_meta = st.number_input("🎯 Defina sua Meta do Dia (R$)", min_value=0.0, value=meta_atual, step=10.0)
+        # Campo de Meta que salva na memória
+        nova_meta = st.number_input("Defina sua Meta Diária (R$)", min_value=0.0, value=meta_atual, step=10.0)
         if nova_meta != meta_atual:
             with open(arq_meta, "w") as f:
                 f.write(str(nova_meta))
             st.rerun()
 
         st.markdown("---")
-        
         col_g, col_p = st.columns(2)
-        g = col_g.number_input("Ganho (R$)", min_value=0.0, step=1.0, key="ganho_input")
-        p = col_p.number_input("Gasto (R$)", min_value=0.0, step=1.0, key="gasto_input")
+        g = col_g.number_input("Ganho de Agora (R$)", min_value=0.0, step=1.0)
+        p = col_p.number_input("Gasto de Agora (R$)", min_value=0.0, step=1.0)
         
-        if st.button("➕ SALVAR E CALCULAR", use_container_width=True, type="primary"):
-            nova_linha = pd.DataFrame({"Data": [date.today().strftime("%d/%m/%Y")], "Ganho": [g], "Gasto": [p]})
-            df_dados =
-                         
+        if st.button("➕ SALVAR REGISTRO", use_container_width=True, type="primary"):
+            hoje_data = date.today().strftime("%d/%m/%Y")
+            nova_linha = pd.DataFrame({"Data": [hoje_data], "Ganho": [g], "Gasto": [p]})
+            df_dados = pd.concat([df_dados, nova_linha], ignore_index=True)
+            df_dados.to_csv(arq_dados, index=False)
+            st.success("Gravado!")
+            st.rerun()
+
+    # --- CÁLCULO E RESULTADO VISUAL ---
+    hoje_str = date.today().strftime("%d/%m/%Y")
+    df_hoje = df_dados[df_dados['Data'] == hoje_str]
+    saldo_hoje = df_hoje['Ganho'].sum() - df_hoje['Gasto'].sum()
+
+    if nova_meta
