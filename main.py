@@ -58,11 +58,13 @@ if st.session_state.logado:
     arq_dados = f"dados_{usuario_path}.csv"
     arq_meta = f"meta_{usuario_path}.txt"
 
-    # Carrega a meta da memória
+    # Carrega a meta da memória com segurança
     if os.path.exists(arq_meta):
         with open(arq_meta, "r") as f:
-            try: meta_atual = float(f.read())
-            except: meta_atual = 0.0
+            try:
+                meta_atual = float(f.read())
+            except:
+                meta_atual = 0.0
     else:
         meta_atual = 0.0
 
@@ -76,8 +78,8 @@ if st.session_state.logado:
     # Tenta ler os dados, se não existir cria um vazio
     if os.path.exists(arq_dados):
         df_dados = pd.read_csv(arq_dados)
-        df_dados['Ganho'] = pd.to_numeric(df_dados['Ganho'], errors='coerce').fillna(0)
-        df_dados['Gasto'] = pd.to_numeric(df_dados['Gasto'], errors='coerce').fillna(0)
+        df_dados['Ganho'] = pd.to_numeric(df_dados['Ganho'], errors='coerce').fillna(0.0)
+        df_dados['Gasto'] = pd.to_numeric(df_dados['Gasto'], errors='coerce').fillna(0.0)
     else:
         df_dados = pd.DataFrame(columns=["Data", "Ganho", "Gasto"])
 
@@ -110,4 +112,39 @@ if st.session_state.logado:
     df_hoje = df_dados[df_dados['Data'] == hoje_str]
     saldo_hoje = df_hoje['Ganho'].sum() - df_hoje['Gasto'].sum()
 
-    if nova_meta
+    # Define cor e texto baseado na meta
+    if nova_meta > 0:
+        if saldo_hoje >= nova_meta:
+            cor_fundo = "#28a745" # Verde
+            texto_status = "✅ META BATIDA!"
+        else:
+            cor_fundo = "#dc3545" # Vermelho
+            texto_status = "❌ AINDA FALTA PARA A META"
+    else:
+        cor_fundo = "#444444" # Cinza
+        texto_status = "🎯 DIGITE UMA META ACIMA"
+
+    st.markdown(f"""
+        <div style="background-color: {cor_fundo}; padding: 30px; border-radius: 15px; text-align: center; color: white;">
+            <p style="margin: 0; opacity: 0.8;">Saldo de Hoje</p>
+            <h1 style="margin: 0; font-size: 3.5em;">R$ {saldo_hoje:.2f}</h1>
+            <p style="font-weight: bold; font-size: 1.2em; margin-top: 10px;">{texto_status}</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # --- HISTÓRICO ---
+    if not df_dados.empty:
+        st.write("### 📜 Histórico Recente")
+        for i, row in df_dados.iloc[::-1].head(5).iterrows():
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([1, 1, 0.4])
+                c1.write(f"📅 {row['Data']}")
+                lucro = float(row['Ganho']) - float(row['Gasto'])
+                c2.write(f"💰 Lucro: R$ {lucro:.2f}")
+                if c3.button("🗑️", key=f"del_{i}"):
+                    df_dados = df_dados.drop(i)
+                    df_dados.to_csv(arq_dados, index=False)
+                    st.rerun()
+else:
+    tela_acesso()
+    
