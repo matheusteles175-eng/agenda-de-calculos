@@ -54,20 +54,35 @@ def tela_acesso():
                 st.success("Conta criada!")
 
 if st.session_state.logado:
-    # --- ÁREA LATERAL ---
+    # --- DADOS DO USUÁRIO ---
     st.sidebar.markdown(f"### 👤 {st.session_state.usuario_atual.capitalize()}")
     
-    # --- NOVIDADE: DEFINIR META ---
+    arq_dados = f"dados_{st.session_state.usuario_atual.lower()}.csv"
+    arq_meta = f"meta_{st.session_state.usuario_atual.lower()}.txt" # Arquivo para salvar a meta individual
+
+    # Carregar a meta salva ou definir 0.0 se não existir
+    if os.path.exists(arq_meta):
+        with open(arq_meta, "r") as f:
+            meta_salva = float(f.read())
+    else:
+        meta_salva = 0.0
+
+    # --- CAMPO DE META NA BARRA LATERAL ---
     st.sidebar.markdown("---")
-    meta_diaria = st.sidebar.number_input("🎯 Sua Meta Diária (R$)", min_value=0.0, value=300.0, step=10.0)
+    nova_meta = st.sidebar.number_input("🎯 Defina sua Meta (R$)", min_value=0.0, value=meta_salva, step=10.0)
     
+    # Se o usuário mudar a meta, a gente salva no arquivo .txt
+    if nova_meta != meta_salva:
+        with open(arq_meta, "w") as f:
+            f.write(str(nova_meta))
+        st.rerun()
+
     if st.sidebar.button("Sair do Sistema"):
         st.session_state.logado = False
         st.rerun()
 
     st.title(f"📊 Painel de Controle")
     
-    arq_dados = f"dados_{st.session_state.usuario_atual.lower()}.csv"
     df_dados = pd.read_csv(arq_dados) if os.path.exists(arq_dados) else pd.DataFrame(columns=["Data", "Ganho", "Gasto"])
 
     # --- FORMULÁRIO DE LANÇAMENTO ---
@@ -88,7 +103,6 @@ if st.session_state.logado:
 
     # --- MÉTRICAS COM LÓGICA DE META ---
     if not df_dados.empty:
-        # Filtra apenas os dados de HOJE para a meta
         hoje = date.today().strftime("%d/%m/%Y")
         df_hoje = df_dados[df_dados['Data'] == hoje]
         
@@ -96,39 +110,12 @@ if st.session_state.logado:
         gasto_hoje = df_hoje['Gasto'].sum()
         saldo_hoje = ganho_hoje - gasto_hoje
         
-        # Cor da meta
-        cor_meta = "#28a745" if saldo_hoje >= meta_diaria else "#dc3545"
-        label_meta = "✅ META ATINGIDA!" if saldo_hoje >= meta_diaria else "❌ ABAIXO DA META"
-
-        st.markdown(f"### Resumo de Hoje ({hoje})")
-        
-        # Mostra o Saldo de Hoje com a cor dinâmica
-        st.markdown(f"""
-            <div style="background-color: {cor_meta}; padding: 20px; border-radius: 10px; text-align: center;">
-                <h2 style="color: white; margin: 0;">R$ {saldo_hoje:.2f}</h2>
-                <strong style="color: white;">{label_meta} (Meta: R$ {meta_diaria:.2f})</strong>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Outras métricas gerais
-        col1, col2 = st.columns(2)
-        col1.metric("Total Ganhos (Geral)", f"R$ {df_dados['Ganho'].sum():.2f}")
-        col2.metric("Total Gastos (Geral)", f"R$ {df_dados['Gasto'].sum():.2f}")
-
-        # --- HISTÓRICO ---
-        st.markdown("---")
-        st.subheader("🗓️ Histórico de Lançamentos")
-        
-        for i, row in df_dados.iterrows():
-            with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([1.5, 2, 2, 0.5])
-                c1.write(f"**{row['Data']}**")
-                c2.markdown(f"<span style='color: #28a745;'>▲ R$ {row['Ganho']:.2f}</span>", unsafe_allow_html=True)
-                c3.markdown(f"<span style='color: #dc3545;'>▼ R$ {row['Gasto']:.2f}</span>", unsafe_allow_html=True)
-                if c4.button("🗑️", key=f"del_{i}"):
-                    df_dados = df_dados.drop(i).to_csv(arq_dados, index=False)
-                    st.rerun()
-    else:
-        st.info("Ainda não existem dados. Comece lançando seus ganhos acima!")
-else:
-    tela_acesso()
+        # Só ativa a cor se a meta for maior que zero
+        if nova_meta > 0:
+            cor_meta = "#28a745" if saldo_hoje >= nova_meta else "#dc3545"
+            label_meta = "✅ META ATINGIDA!" if saldo_hoje >= nova_meta else "❌ ABAIXO DA META"
+            meta_info = f"(Meta: R$ {nova_meta:.2f})"
+        else:
+            cor_meta = "#333" # Cinza se não tiver meta
+            label_meta
+                               
