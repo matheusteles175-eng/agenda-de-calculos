@@ -48,10 +48,11 @@ conn, cursor = conectar()
 
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 
-# --- LOGIN ---
+# --- 2. TELA DE ACESSO (LOGIN E CADASTRO) ---
 if not st.session_state.autenticado:
     st.markdown("<h1 style='text-align: center;'>🏁 CheckPoint Shift</h1>", unsafe_allow_html=True)
     aba_login, aba_cad = st.tabs(["🔑 ACESSAR", "📝 CRIAR CONTA"])
+    
     with aba_login:
         u = st.text_input("Usuário", key="login_user").lower().strip()
         s = st.text_input("Senha", type="password", key="login_pass")
@@ -59,13 +60,25 @@ if not st.session_state.autenticado:
             if cursor.execute("SELECT * FROM usuarios WHERE usuario=? AND senha=?", (u, s)).fetchone():
                 st.session_state.autenticado, st.session_state.user = True, u
                 st.rerun()
-            else: st.error("Acesso negado.")
+            else: st.error("Acesso negado. Verifique usuário e senha.")
+            
+    with aba_cad:
+        nu = st.text_input("Definir Novo Usuário", key="cad_user").lower().strip()
+        ns = st.text_input("Definir Senha", type="password", key="cad_pass")
+        if st.button("CADASTRAR MINHA CONTA"):
+            if nu and ns:
+                try:
+                    cursor.execute("INSERT INTO usuarios (usuario, senha) VALUES (?,?)", (nu, ns))
+                    conn.commit()
+                    st.success("✅ Conta criada com sucesso! Vá para a aba ACESSAR.")
+                except: st.error("❌ Este nome de usuário já está em uso.")
+            else: st.warning("Preencha todos os campos para cadastrar.")
     st.stop()
 
 user = st.session_state.user
 hoje = date.today()
 
-# --- CONFIGURAÇÃO DO VEÍCULO ---
+# --- 3. CONFIGURAÇÃO DO VEÍCULO ---
 v_data = cursor.execute("SELECT * FROM veiculo WHERE usuario=?", (user,)).fetchone()
 if "editando_veiculo" not in st.session_state: st.session_state.editando_veiculo = False
 
@@ -85,7 +98,7 @@ km_atual_bd = int(v_data[1])
 km_alvo_revisao = int(v_data[2])
 km_inicial_config = int(v_data[6])
 
-# --- DASHBOARD ---
+# --- 4. DASHBOARD PRINCIPAL ---
 st.title(f"🚀 PAINEL: {user.upper()}")
 tab_resumo, tab_ganhos, tab_caixinhas = st.tabs(["📊 MANUTENÇÃO", "💰 GANHOS & RELATÓRIOS", "🎯 SONHOS"])
 
@@ -107,7 +120,7 @@ with tab_resumo:
         prog = max(0.0, min(1.0, (km_atual_bd - km_inicial_config) / total_ciclo)) if total_ciclo > 0 else 1.0
         st.metric("KM Atual", f"{km_atual_bd} km")
         st.progress(prog)
-        st.info(f"Faltam {km_falta} km.")
+        st.info(f"Faltam {km_falta} km para a próxima troca.")
 
 with tab_ganhos:
     meta_dia = st.number_input("Meta Diária (R$)", value=400.0)
@@ -134,11 +147,9 @@ with tab_ganhos:
         else:
             st.markdown(f'<div class="card-meta meta-falta"><h1>DÉFICIT ⚠️</h1><p style="font-size:40px;">R$ {lucro_total:.2f}</p></div>', unsafe_allow_html=True)
 
-    st.subheader("📜 Histórico e Relatórios")
+    st.subheader("📜 Histórico e Análises Diárias")
     for _, r in df_g.sort_values(by='id', ascending=False).iterrows():
         lucro_dia = r['ganho'] - r['gasto']
-        
-        # Cálculo de tempo e médias
         try:
             fmt = '%H:%M'
             tdiff = datetime.strptime(r['h_fim'], fmt) - datetime.strptime(r['h_ini'], fmt)
@@ -152,32 +163,41 @@ with tab_ganhos:
             st.write(f"🚗 **KM:** {int(r['km'])} km | ⏱ **Tempo:** {horas_trab:.1f} horas")
             st.write(f"📈 **Média por KM:** R$ {media_km:.2f}/km")
             st.write(f"💰 **Média por Hora:** R$ {media_h:.2f}/h")
-            if st.button("🗑️ EXCLUIR", key=f"del_{r['id']}"):
+            if st.button("🗑️ EXCLUIR REGISTRO", key=f"del_{r['id']}"):
                 cursor.execute("UPDATE veiculo SET km_ini = km_ini - ? WHERE usuario=?", (r['km'], user))
                 cursor.execute("DELETE FROM ganhos WHERE id=?", (r['id'],))
                 conn.commit(); st.rerun()
 
 with tab_caixinhas:
-    st.subheader("🎯 Caixinha dos Sonhos")
+    st.subheader("🎯 Sonhos e Objetivos")
+    with st.expander("➕ NOVA META"):
+        with st.form("meta_new"):
+            n_m = st.text_input("Qual o seu sonho?"); v_m = st.number_input("Valor Necessário")
+            if st.form_submit_button("CRIAR"):
+                cursor.execute("INSERT INTO metas (usuario, item, valor, data, guardado) VALUES (?,?,?,?,?)", (user, n_m, v_m, str(hoje), 0.0))
+                conn.commit(); st.rerun()
+
     df_m = pd.read_sql_query(f"SELECT * FROM metas WHERE usuario='{user}'", conn)
     for _, m in df_m.iterrows():
         with st.container():
             st.markdown(f"### 🚀 {m['item']}")
             st.write(f"**Guardado: R$ {m['guardado']:.2f}** de R$ {m['valor']:.2f}")
             st.progress(min(m['guardado']/m['valor'], 1.0) if m['valor'] > 0 else 0)
-            v_acao = st.number_input("Valor:", key=f"v_{m['id']}")
+            v_acao = st.number_input("Valor Operação:", key=f"v_{m['id']}")
             c1, c2 = st.columns(2)
             if c1.button("📥 DEPOSITAR", key=f"in_{m['id']}"):
                 cursor.execute("UPDATE metas SET guardado = guardado + ? WHERE id=?", (v_acao, m['id'])); conn.commit(); st.rerun()
             if c2.button("🗑️ EXCLUIR META", key=f"del_m_{m['id']}"):
                 cursor.execute("DELETE FROM metas WHERE id=?", (m['id'],)); conn.commit(); st.rerun()
 
-# --- SIDEBAR ---
-st.sidebar.title("⚙️ CONFIGURAÇÕES")
+# --- 5. SIDEBAR ---
+st.sidebar.title("⚙️ OPÇÕES")
 if st.sidebar.button("🚗 RECONFIGURAR VEÍCULO"):
     st.session_state.editando_veiculo = True; st.rerun()
-if st.sidebar.button("⚠️ ZERAR MEUS DADOS"):
+if st.sidebar.button("⚠️ ZERAR TODOS OS MEUS DADOS"):
     cursor.execute("DELETE FROM ganhos WHERE usuario=?", (user,))
     cursor.execute("DELETE FROM metas WHERE usuario=?", (user,))
     cursor.execute("DELETE FROM veiculo WHERE usuario=?", (user,))
     conn.commit(); st.rerun()
+if st.sidebar.button("🚪 SAIR"):
+    st.session_state.autenticado = False; st.rerun()
