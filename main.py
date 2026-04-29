@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 from datetime import date
 
-# --- 1. CONFIGURAÇÃO E ESTILO PERSONALIZADO ---
+# --- 1. CONFIGURAÇÃO E ESTILO (LIMPEZA TOTAL DE "PANOS BRANCOS") ---
 st.set_page_config(
     page_title="CheckPoint Shift 🏁", 
     layout="wide",
@@ -20,9 +20,9 @@ st.markdown("""
         background-attachment: fixed;
     }
     
-    /* DESTAQUE DA SETINHA (SIDEBAR) - PARA NÃO SUMIR NO FUNDO */
+    /* DESTAQUE DA SETINHA (SIDEBAR) - VERDE VIBRANTE */
     button[kind="headerNoContext"] {
-        background-color: #28a745 !important; /* Verde destaque */
+        background-color: #28a745 !important;
         color: white !important;
         border-radius: 50% !important;
         width: 60px !important;
@@ -31,13 +31,26 @@ st.markdown("""
         top: 15px !important;
         left: 15px !important;
         z-index: 999999 !important;
-        box-shadow: 0px 4px 15px rgba(0,0,0,0.5) !important;
-        border: 2px solid rgba(255,255,255,0.3) !important;
+        box-shadow: 0px 4px 15px rgba(0,0,0,0.7) !important;
+        border: 2px solid white !important;
     }
     button[kind="headerNoContext"] svg {
         fill: white !important;
         width: 35px !important;
         height: 35px !important;
+    }
+
+    /* REMOVENDO PANOS BRANCOS DE CAMPOS E BOTÕES */
+    input, [data-baseweb="input"], [data-baseweb="base-input"] {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        color: white !important;
+        border-radius: 10px !important;
+    }
+    
+    /* TIRA O BRANCO AO CLICAR NOS CAMPOS */
+    div[data-baseweb="input"] > div {
+        background-color: transparent !important;
+        color: white !important;
     }
 
     /* TEXTOS E INTERFACE GRANDES */
@@ -52,23 +65,33 @@ st.markdown("""
         color: white !important;
     }
 
-    /* CARDS ESTILO VIDRO */
+    /* CARDS ESTILO VIDRO TRANSPARENTE */
     [data-testid="stForm"], .st-expander, .stMetric, div[data-testid="stVerticalBlock"] > div {
-        background-color: rgba(255, 255, 255, 0.08) !important;
+        background-color: rgba(255, 255, 255, 0.05) !important;
         backdrop-filter: blur(15px);
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 20px !important;
         padding: 25px;
     }
 
-    /* BOTÕES GIGANTES */
+    /* BOTÕES GIGANTES E SEM FUNDO BRANCO */
     .stButton>button {
         width: 100%; border-radius: 12px; font-weight: bold; 
         font-size: 22px !important; height: 3.5em;
         background-color: rgba(255, 255, 255, 0.1) !important; 
-        color: white !important; border: 1px solid rgba(255, 255, 255, 0.4) !important;
+        color: white !important; 
+        border: 1px solid rgba(255, 255, 255, 0.4) !important;
     }
-    .stButton>button:hover { background-color: #28a745 !important; color: white !important; border: none; }
+    .stButton>button:hover { 
+        background-color: #28a745 !important; 
+        color: white !important; 
+        border: none !important;
+    }
+    
+    /* CORRIGE O FUNDO BRANCO DENTRO DOS FORMULÁRIOS */
+    div[data-testid="stForm"] {
+        background-color: rgba(0, 0, 0, 0.3) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
