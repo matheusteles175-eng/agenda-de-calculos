@@ -1,3 +1,4 @@
+
 import streamlit as st
 import sqlite3
 import pandas as pd
@@ -137,7 +138,6 @@ with tab_ganhos:
         lucro_total = df_g['ganho'].sum() - df_g['gasto'].sum()
         meta_acumulada = len(df_g) * meta_dia
         
-        # --- LÓGICA DO QUADRADÃO ---
         if lucro_total >= meta_acumulada:
             diferenca = lucro_total - meta_acumulada
             st.markdown(f'<div class="card-meta meta-sucesso"><h1>META ATINGIDA! 🎯</h1><p style="font-size:40px; font-weight:bold;">R$ {lucro_total:.2f}</p><p style="font-size:20px;">Você ficou <b>ACIMA</b> da meta em: <b>R$ {diferenca:.2f}</b></p></div>', unsafe_allow_html=True)
@@ -153,12 +153,12 @@ with tab_ganhos:
             horas_trab = tdiff.total_seconds() / 3600
         except: horas_trab = 0
         
-        # --- CORREÇÃO: Média baseada no GANHO BRUTO ---
+        # --- AMBOS CALCULADOS PELO VALOR BRUTO (r['ganho']) ---
         media_km = r['ganho'] / r['km'] if r['km'] > 0 else 0
-        media_h = lucro_dia / horas_trab if horas_trab > 0 else 0
+        media_h = r['ganho'] / horas_trab if horas_trab > 0 else 0
         
         with st.expander(f"📅 {r['data']} | Lucro: R$ {lucro_dia:.2f}"):
-            st.write(f"🚗 KM: {int(r['km'])} | ⏱ Tempo: {horas_trab:.1f}h | 📈 R$/km (Bruto): {media_km:.2f} | 💰 R$/h (Líquido): {media_h:.2f}")
+            st.write(f"🚗 KM: {int(r['km'])} | ⏱ Tempo: {horas_trab:.1f}h | 📈 R$/km: {media_km:.2f} | 💰 R$/h: {media_h:.2f}")
             if st.button("🗑️ EXCLUIR", key=f"del_{r['id']}"):
                 cursor.execute("UPDATE veiculo SET km_ini = km_ini - ? WHERE usuario=?", (r['km'], user))
                 cursor.execute("DELETE FROM ganhos WHERE id=?", (r['id'],)); conn.commit(); st.rerun()
